@@ -1,53 +1,150 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from google import genai
+from google.genai import types
+from typing import List
+# Import our database helpers
+from database import get_db_connection
 
 app = FastAPI()
 
-# Crucial for Hackathons: Allow the Next.js frontend to talk to FastAPI
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Next.js default port
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize the official Google GenAI Client
-# Ensure you run 'export GEMINI_API_KEY="your_actual_key"' in your terminal first!
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    print("⚠️ WARNING: GEMINI_API_KEY environment variable is missing!")
-
 client = genai.Client()
 
 class TaskRequest(BaseModel):
     task_title: str
+    deadline: str
+    difficulty: str
+
+class AISubtaskSchema(BaseModel):
+    subtasks: List[str] = Field(
+        description="A list of 3-5 immediate, highly specific, actionable subtasks to complete the main goal before the deadline."
+    )
 
 @app.get("/api/health")
 def health_check():
     return {"status": "Backend is alive!"}
 
+# --- STEP 4 UPGRADE: Process task, prompt Gemini, and commit to SQLite ---
+
+@app.get("/api/debug-tasks")
+def debug_tasks():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Grab all records from both tables to see what's inside
+    tasks = cursor.execute("SELECT * FROM tasks").fetchall()
+    subtasks = cursor.execute("SELECT * FROM subtasks").fetchall()
+    
+    conn.close()
+    
+    return {
+        "stored_tasks": [dict(t) for t in tasks],
+        "stored_subtasks": [dict(s) for s in subtasks]
+    }
+# --- STEP 5 & 6 BACKEND: Fetch active tracking dashboard & Toggle status ---
+
+@app.get("/api/dashboard")
+def get_dashboard():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Fetch the latest task added
+    task = cursor.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT 1").fetchone()
+    if not task:
+        conn.close()
+        return {"task": None, "subtasks": []}
+        
+    # Fetch all subtasks belonging to that active task
+    subtasks = cursor.execute("SELECT * FROM subtasks WHERE task_id = ?", (task["id"],)).fetchall()
+    conn.close()
+    
+    return {
+        "task": dict(task),
+        "subtasks": [dict(s) for s in subtasks]
+    }
+
+class ToggleRequest(BaseModel):
+    subtask_id: int
+    is_completed: int
+
+@app.post("/api/toggle-subtask")
+def toggle_subtask(payload: ToggleRequest):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Update the check status (0 or 1) in SQLite
+    cursor.execute(
+        "UPDATE subtasks SET is_completed = ? WHERE id = ?",
+        (payload.is_completed, payload.subtask_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "success"}
 @app.post("/api/test-ai")
 def test_ai(payload: TaskRequest):
     try:
-        # Prompt telling Gemini exactly what its identity is for this hackathon
+        # 1. Ask Gemini to break it down into micro-steps
         prompt = f"""
-        You are the 'Last-Minute Life Saver' agent. 
+        You are 'The Last-Minute Life Saver' productivity agent. 
         The user is struggling with procrastination on this task: '{payload.task_title}'.
-        Give them a 2-sentence response:
-        1. Break down the immediate first step they need to do right now.
-        2. Give them a high-energy, urgent motivation kick.
+        Their absolute deadline is: '{payload.deadline}'.
+        They rated the difficulty/urgency level as: '{payload.difficulty}'.
+        
+        Break this task down into a realistic, micro-step milestone plan. 
+        Keep each step action-oriented (e.g., 'Solve 5 easy questions' instead of 'Do DSA').
         """
         
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=AISubtaskSchema,
+                temperature=0.3
+            ),
         )
         
-        return {"ai_response": response.text}
+        validated_data = AISubtaskSchema.model_validate_json(response.text)
+        
+        # 2. Open our database connection to save everything permanently
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert the parent task row into the 'tasks' table
+        cursor.execute(
+            "INSERT INTO tasks (title, deadline, difficulty) VALUES (?, ?, ?)",
+            (payload.task_title, payload.deadline, payload.difficulty)
+        )
+        # Grab the auto-incremented ID generated for this brand new task
+        parent_task_id = cursor.lastrowid
+        
+        # Loop through each item generated by Gemini and save it to the 'subtasks' table
+        for subtask_title in validated_data.subtasks:
+            cursor.execute(
+                "INSERT INTO subtasks (task_id, title, is_completed) VALUES (?, ?, 0)",
+                (parent_task_id, subtask_title)
+            )
+            
+        conn.commit()
+        conn.close()
+        
+        # For temporary verification, we still return the list text
+        formatted_result = "\n".join([f"• {step}" for step in validated_data.subtasks])
+        
+        return {
+            "task_id": parent_task_id,
+            "ai_response": formatted_result
+        }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database or API Error: {str(e)}")

@@ -39,6 +39,39 @@ Instead of giving generic advice, Dash breaks overwhelming work into realistic, 
 
 ---
 
+## 📸 Screenshots
+
+### 🏠 Home
+
+![Home](screenshots/hero.png)
+
+---
+
+### 🤖 AI Dashboard
+
+![Dashboard](screenshots/dashboard1.png)
+![Dashboard](screenshots/Dashboard2.png)
+
+---
+
+### 🚑 Recovery Mode
+
+![Recovery Mode](screenshots/workspace.png)
+
+---
+
+### ✅ Critical Path
+
+![Critical Path](screenshots/critical_path.png)
+
+---
+
+### 👻 Splash Screen
+
+![Splash Screen](screenshots/splash.png)
+
+---
+
 ## 🛠️ Tech Stack
 
 ### Frontend

@@ -23,6 +23,7 @@ Dash uses **Google Gemini AI** to analyze a user's task, deadline, and difficult
 Instead of giving generic advice, Dash breaks overwhelming work into realistic, achievable steps so users always know what to do next.
 
 ---
+
 ## 🌐 Live Demo
 
 **Frontend**
@@ -35,6 +36,7 @@ https://dash-backend-526477031025.asia-south1.run.app
 https://dash-backend-526477031025.asia-south1.run.app/docs
 
 ---
+
 ## 🚀 Features
 
 - 🧠 AI-powered task planning using Google Gemini

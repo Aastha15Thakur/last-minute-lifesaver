@@ -55,7 +55,7 @@ export default function Home() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/dashboard');
+      const res = await fetch("https://dash-backend-526477031025.asia-south1.run.app/api/dashboard");
       const data = await res.json();
       if (data.task) {
         setActiveTask(data.task);
@@ -69,7 +69,7 @@ export default function Home() {
   const fetchCoachAnalysis = async () => {
     setLoadingAnalysis(true);
     try {
-      const res = await fetch('http://localhost:8000/api/analyze-progress');
+      const res = await fetch('http://dash-backend-526477031025.asia-south1.run.app/api/analyze-progress');
       console.log('Status:', res.status);
       const data = await res.json();
       console.log('Coach Data:', data);
@@ -83,7 +83,7 @@ export default function Home() {
 
   const fetchRecoveryPlan = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/recovery-plan');
+      const res = await fetch('http://dash-backend-526477031025.asia-south1.run.app/api/recovery-plan');
       if (res.ok) {
         const data = await res.json();
         setRecoveryPlan(data);
@@ -104,7 +104,7 @@ export default function Home() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/generate-plan', {
+      const response = await fetch('https://dash-backend-526477031025.asia-south1.run.app/api/generate-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task_title: taskInput, deadline, difficulty }),
@@ -130,7 +130,7 @@ export default function Home() {
       prev.map(sub => (sub.id === id ? { ...sub, is_completed: newStatus } : sub))
     );
     try {
-      await fetch('http://127.0.0.1:8000/api/toggle-subtask', {
+      await fetch('https://dash-backend-526477031025.asia-south1.run.app/api/toggle-subtask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subtask_id: id, is_completed: newStatus }),

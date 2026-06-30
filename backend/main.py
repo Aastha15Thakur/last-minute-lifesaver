@@ -14,7 +14,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+    "http://localhost:3000",
+    "https://dash-frontend-526477031025.asia-south1.run.app",
+],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
